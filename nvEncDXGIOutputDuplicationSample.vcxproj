@@ -23,6 +23,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>nvEncDXGIOutputDuplicationSample</RootNamespace>
     <ProjectName>nvEncDXGIOutputDuplicationSample</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -53,6 +54,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -72,6 +74,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <TargetName>yolo</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -80,6 +83,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <TargetName>yolo</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -109,14 +113,13 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\Samples\NvCodec\;..\Samples;..\Samples\Utils;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Repos\src\opencv-4.6.0\build\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>
-      </AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;opencv_world460.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\lib\x64;C:\Repos\src\opencv-4.6.0\build\install\x64\vc16\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -142,28 +145,54 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Resources\OPENCV\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>C:\Repos\screencap-to-cvmat\tensorRT;C:\Repos\src\opencv-4.6.0\build\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;opencv_world460.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Resources\OPENCV\x64\vc17\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;opencv_world460.lib;C:\Repos\protobuild\Release\*.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\lib\x64;C:\Repos\src\opencv-4.6.0\build\install\x64\vc16\lib;C:\Repos\protobuild\Release</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DDAImpl.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="tensorRT\builder\trt_builder.cpp" />
+    <ClCompile Include="tensorRT\common\cuda_tools.cpp" />
+    <ClCompile Include="tensorRT\common\ilogger.cpp" />
+    <ClCompile Include="tensorRT\common\json.cpp" />
+    <ClCompile Include="tensorRT\common\trt_tensor.cpp" />
+    <ClCompile Include="tensorRT\import_lib.cpp" />
+    <ClCompile Include="tensorRT\infer\trt_infer.cpp" />
+    <ClCompile Include="tensorRT\onnxplugin\onnxplugin.cpp" />
+    <ClCompile Include="tensorRT\onnxplugin\plugin_binary_io.cpp" />
+    <ClCompile Include="tensorRT\onnx\onnx-ml.pb.cpp" />
+    <ClCompile Include="tensorRT\onnx\onnx-operators-ml.pb.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\builtin_op_importers.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\LoopHelpers.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\ModelImporter.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\NvOnnxParser.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\onnx2trt_utils.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\OnnxAttrs.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\onnxErrorRecorder.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\RNNHelpers.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\ShapedWeights.cpp" />
+    <ClCompile Include="tensorRT\onnx_parser\ShapeTensor.cpp" />
+    <ClCompile Include="yolo\yolo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Samples\NvCodec\NvEncoder\nvEncodeAPI.h" />
@@ -173,7 +202,12 @@
     <ClInclude Include="DDAImpl.h" />
     <ClInclude Include="Defs.h" />
   </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="tensorRT\common\preprocess_kernel.cu" />
+    <CudaCompile Include="yolo\yolo_decode.cu" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.1.targets" />
   </ImportGroup>
 </Project>
