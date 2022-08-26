@@ -48,20 +48,6 @@ inline void* safeCudaMalloc(size_t memSize)
 
 
 
-class Logger : public nvinfer1::ILogger
-{
-public:
-
-	void log(Severity severity, const char* msg) override 
-	{
-		if ((severity == Severity::kERROR) || (severity == Severity::kINTERNAL_ERROR)) 
-		{
-			std::cerr << msg << std::endl;
-		}
-	}
-};
-
-
 class TensorrtPoseNet
 {
 	template <typename T>
@@ -69,8 +55,7 @@ class TensorrtPoseNet
 
 public: 
 
-	TensorrtPoseNet(const std::string &onnxFilePath, int maxBatchSize, float confThresh, float nmsThresh);
-	TensorrtPoseNet(const std::string &engineFilePath, float confThresh, float nmsThresh);
+	TensorrtPoseNet(const std::string &engineFilePath = "trt_pose_fp16.engine", float confThresh = 0.01, float nmsThresh = 0.1);
 	
 	void infer(cv::Mat &img);	
 
@@ -105,8 +90,8 @@ private:
 	std::vector<void*> cudaBuffers;
 	void *cudaFrame;
 
-	float confThreshold = 0.4f;
-	float nmsThreshold = 0.4f;
+	float confThreshold = 0.01f;
+	float nmsThreshold = 0.1f;
 
 
 };

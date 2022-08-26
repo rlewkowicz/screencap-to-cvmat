@@ -1,9 +1,38 @@
+#include "NvInferRuntimeCommon.h"
 #include "TensorrtPoseNet.h"
+#include <../tensorRT/common/ilogger.hpp>
 
+using namespace nvinfer1;
+class Logger : public ILogger {
+public:
+	virtual void log(Severity severity, const char* msg) noexcept override {
+
+		if (severity == Severity::kINTERNAL_ERROR) {
+			INFOE("NVInfer INTERNAL_ERROR: %s", msg);
+			abort();
+		}
+		else if (severity == Severity::kERROR) {
+			INFOE("NVInfer: %s", msg);
+		}
+		else  if (severity == Severity::kWARNING) {
+			INFOW("NVInfer: %s", msg);
+		}
+		else  if (severity == Severity::kINFO) {
+			INFOD("NVInfer: %s", msg);
+		}
+		else {
+			INFOD("%s", msg);
+		}
+	}
+};
+
+static Logger gLogger;
 
 #define MAX_WORKSPACE (1 << 30) // 1G workspace memory
- 
-static Logger gLogger;
+
+
+
+
 
 // Load and deserialize yolo inference engine
 TensorrtPoseNet::TensorrtPoseNet(const std::string &engineFilePath, float confThresh, float nmsThresh)
@@ -12,7 +41,7 @@ TensorrtPoseNet::TensorrtPoseNet(const std::string &engineFilePath, float confTh
 
 
 	//cudaSetDevice(1);
-	cudaSetDevice(0);
+	cudaSetDevice(1);
 	std::fstream file;
 
 	confThreshold = confThresh;
@@ -49,60 +78,7 @@ TensorrtPoseNet::TensorrtPoseNet(const std::string &engineFilePath, float confTh
 	initEngine();
 }
 
-// Build an yolo inference engine from onnx model
-TensorrtPoseNet::TensorrtPoseNet(const std::string &onnxFilePath, int maxBatchSize, float confThresh, float nmsThresh)
-{
-	std::cout << "Loading OpenPose Onnx Model ... " << std::endl;
 
-	cudaSetDevice(0);
-
-	auto builder = UniquePtr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(gLogger));
-	assert(builder != nullptr);
-
-	const auto explicitBatch = 1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
-	nvinfer1::INetworkDefinition* network = builder->createNetworkV2(explicitBatch);
-
-	assert(network != nullptr);
-
-	auto parser = UniquePtr<nvonnxparser::IParser>(nvonnxparser::createParser(*network, gLogger));
-	assert(parser != nullptr);
-
-	if (!parser->parseFromFile(onnxFilePath.c_str(), 2))
-	{
-		std::string msg("failed to parse onnx file");
-		gLogger.log(nvinfer1::ILogger::Severity::kERROR, msg.c_str());
-		exit(EXIT_FAILURE);
-	}
-
-	builder->setMaxBatchSize(maxBatchSize);
-	builder->setMaxWorkspaceSize(MAX_WORKSPACE);
-
-	std::cout << "Setting fp16 mode ..." << std::endl;
-	if (!builder->platformHasFastFp16())
-	{
-		std::cout << "Notice: the platform do not have fast fp16" << std::endl;
-	}
-	else {
-		builder->setFp16Mode(true);
-		std::cout << "Done." << std::endl;
-	}
-
-	std::cout << "Begin building engine..." << std::endl;
-	engine = UniquePtr<nvinfer1::ICudaEngine>(builder->buildCudaEngine(*network));
-
-	if (!engine)
-	{
-		std::string error_message = "Unable to create engine";
-		gLogger.log(nvinfer1::ILogger::Severity::kERROR, error_message.c_str());
-		exit(-1);
-	}
-	std::cout << "End building engine..." << std::endl;
-
-	context = UniquePtr<nvinfer1::IExecutionContext>(engine->createExecutionContext());
-	assert(context);
-
-	initEngine();
-}
 
 void TensorrtPoseNet::initEngine()
 {

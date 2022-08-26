@@ -42,11 +42,19 @@
 #include <builder/trt_builder.hpp>
 #include <infer/trt_infer.hpp>
 #include <common/ilogger.hpp>
+#include "openpose/Openpose.h"
+#include "openpose/TensorrtPoseNet.h"
+#include <atlstr.h>
+#include <future>
 
 cv::Mat mat;
+bool DEBUG=false;
 
 using namespace std;
 using namespace cv;
+
+TensorrtPoseNet posenet;
+Openpose openpose(posenet.outputDims[0]);
 
 static const char* cocolabels[] = {
     "enemy"
@@ -68,41 +76,34 @@ static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image
     vector<cv::Mat> images;
 
     images.emplace_back(image);
-
     boxes_array = engine->commits(images);
-
-    // wait all result
     boxes_array.back().get();
 
-    /*float inference_average_time = (timestamp_now_float() - begin_timer) / ntest / 1;*/
     auto type_name = Yolo::type_name(type);
     auto mode_name = TRT::mode_string(mode);
-    //printf("%s[%s] average: %.2f ms / image, FPS: %.2f\n", "doot", type_name, inference_average_time, 1000 / inference_average_time);
 
     for (int i = 0; i < 1; ++i) {
 
         auto boxes = boxes_array[i].get();
 
         for (auto& obj : boxes) {
-            uint8_t b, g, r;
-            tie(b, g, r) = iLogger::random_color(obj.class_label);
-            cv::rectangle(image, cv::Point(obj.left, obj.top), cv::Point(obj.right, obj.bottom), cv::Scalar(b, g, r), 5);
+            if (DEBUG) {
+                uint8_t b, g, r;
+                tie(b, g, r) = iLogger::random_color(obj.class_label);
+                cv::rectangle(image, cv::Point(obj.left, obj.top), cv::Point(obj.right, obj.bottom), cv::Scalar(b, g, r), 5);
 
-            auto name = cocolabels[obj.class_label];
-            auto caption = iLogger::format("%s %.2f", name, obj.confidence);
-            int width = cv::getTextSize(caption, 0, 1, 2, nullptr).width + 10;
-            cv::rectangle(image, cv::Point(obj.left - 3, obj.top - 33), cv::Point(obj.left + width, obj.top), cv::Scalar(b, g, r), -1);
-            cv::putText(image, caption, cv::Point(obj.left, obj.top - 5), 0, 1, cv::Scalar::all(0), 2, 16);
+                auto name = cocolabels[obj.class_label];
+                auto caption = iLogger::format("%s %.2f", name, obj.confidence);
+                int width = cv::getTextSize(caption, 0, 1, 2, nullptr).width + 10;
+                cv::rectangle(image, cv::Point(obj.left - 3, obj.top - 33), cv::Point(obj.left + width, obj.top), cv::Scalar(b, g, r), -1);
+                cv::putText(image, caption, cv::Point(obj.left, obj.top - 5), 0, 1, cv::Scalar::all(0), 2, 16);
+            }
             img_and_coord.x = obj.right;
             img_and_coord.y = obj.bottom;
         }
-
-        //string save_path = cv::format("%s/%s.jpg", root.c_str(), "doot");
-        //printf("Save to %s, %d object, average time %.2f ms\n", save_path.c_str(), boxes.size(), inference_average_time);
-
-        cv::circle(image, Point(320, 320), 3, Scalar(0, 0, 255), FILLED, LINE_AA);
-
-        img_and_coord.mat = image;
+        if (DEBUG) {
+            img_and_coord.mat = image;
+        }
 
         return img_and_coord;
     }
@@ -263,6 +264,11 @@ public:
         return hr;
     }
 
+    void run_pose() {
+        posenet.infer(mat);
+        openpose.detect(posenet.cpuCmapBuffer, posenet.cpuPafBuffer, mat);
+    }
+
     HRESULT Preproc(shared_ptr<Yolo::Infer> engine, Yolo::Type type, TRT::Mode mode, const string& model)
     {
         HRESULT hr = S_OK;
@@ -290,14 +296,17 @@ public:
         cv::directx::convertFromD3D11Texture2D(myText, mat);
 
         cv::cvtColor(mat, mat, cv::COLOR_RGBA2RGB);
-
-        img_and_coord img_and_coord = run_inf_debug(engine, mat, 1, mode, type);
-
-        cv::namedWindow("enemy");
-        cv::resizeWindow("enemy", 640, 640);
-        cv::imshow("enemy", img_and_coord.mat);
-        cv::waitKey(1);
-
+            
+        auto t1 = std::async(std::launch::async, run_inf_debug, engine, mat, 1, mode, type);
+        run_pose();
+        img_and_coord img_and_coord = t1.get();
+        
+        if (DEBUG) {
+            cv::namedWindow("enemy");
+            cv::resizeWindow("enemy", 640, 640);
+            cv::imshow("enemy", img_and_coord.mat);
+            cv::waitKey(1);
+        }
         SAFE_RELEASE(pDupTex2D);
         returnIfError(hr);
 
@@ -382,7 +391,7 @@ int Grab60FPS(int nFrames)
                 Demo.Capture(wait);
             }
             RESET_WAIT_TIME(start, end, interval, freq);
-            hr = Demo.Preproc(engine, Yolo::Type::V5, TRT::Mode::FP16, "yolov5l", pose);
+            hr = Demo.Preproc(engine, Yolo::Type::V5, TRT::Mode::FP16, "yolov5l");
             if (FAILED(hr))
             {
                 printf("Preproc failed with error 0x%08x\n", hr);
@@ -396,6 +405,13 @@ int Grab60FPS(int nFrames)
 
 int main(int argc, char** argv)
 {
+
+    CString envvar;
+    if (envvar.GetEnvironmentVariable(_T("DEBUG")))
+    {
+        DEBUG = true;
+    }
+
     int nFrames = 1;
     int ret = 0;
     

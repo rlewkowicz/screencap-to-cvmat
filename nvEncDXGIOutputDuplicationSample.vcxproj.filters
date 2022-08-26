@@ -90,6 +90,27 @@
     <ClCompile Include="yolo\yolo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="openpose\Openpose.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="openpose\TensorrtPoseNet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="openpose\parse\connect_parts.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="openpose\parse\find_peaks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="openpose\parse\munkres.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="openpose\parse\paf_score_graph.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="openpose\parse\refine_peaks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Defs.h">
@@ -110,12 +131,39 @@
     <ClInclude Include="..\Samples\NvCodec\NvEncoder\NvEncoderD3D11.h">
       <Filter>Header Files\NVEnc</Filter>
     </ClInclude>
+    <ClInclude Include="openpose\Openpose.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="openpose\resize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="openpose\TensorrtPoseNet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="openpose\parse\connect_parts.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="openpose\parse\find_peaks.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="openpose\parse\munkres.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="openpose\parse\paf_score_graph.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="openpose\parse\refine_peaks.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="yolo\yolo_decode.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="tensorRT\common\preprocess_kernel.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="openpose\resize.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
   </ItemGroup>
