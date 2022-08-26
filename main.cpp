@@ -39,10 +39,14 @@
 #include "opencv2/core.hpp"
 #include "opencv2/core/opengl.hpp"
 #include <opencv2/highgui/highgui_c.h>
+#include <builder/trt_builder.hpp>
+#include <infer/trt_infer.hpp>
+#include <common/ilogger.hpp>
 
 cv::Mat mat;
 
 using namespace std;
+using namespace cv;
 
 static const char* cocolabels[] = {
     "enemy"
@@ -95,78 +99,16 @@ static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image
 
         //string save_path = cv::format("%s/%s.jpg", root.c_str(), "doot");
         //printf("Save to %s, %d object, average time %.2f ms\n", save_path.c_str(), boxes.size(), inference_average_time);
+
+        cv::circle(image, Point(320, 320), 3, Scalar(0, 0, 255), FILLED, LINE_AA);
+
         img_and_coord.mat = image;
 
         return img_and_coord;
     }
 }
 
-static shared_ptr<Yolo::Infer> inference_and_performance(int deviceid, const string& engine_file, TRT::Mode mode, Yolo::Type type) {
-
-    auto engine = Yolo::create_infer(
-        engine_file,                // engine file
-        type,                       // yolo type, Yolo::Type::V5 / Yolo::Type::X
-        deviceid,                   // gpu id
-        0.60f,                      // confidence threshold
-        0.80f,                      // nms threshold
-        Yolo::NMSMethod::FastGPU,   // NMS method, fast GPU / CPU
-        1,                          // max objects
-        false                       // preprocess use multi stream
-    );
-    if (engine == nullptr) {
-        INFOE("Engine is nullptr");
-        exit(1);
-    }
-
-    //vector<cv::Mat> images;
-    //for (int i = 0; i < 10; ++i) {
-    //    images.emplace_back(mat);
-    //}
-
-    //// warmup
-    //vector<shared_future<Yolo::BoxArray>> boxes_array;
-    //for (int i = 0; i < 10; ++i)
-    //    boxes_array = engine->commits(images);
-    //boxes_array.back().get();
-    //boxes_array.clear();
-
-    ///////////////////////////////////////////////////////////
-    //const int ntest = 100;
-    //auto begin_timer = iLogger::timestamp_now_float();
-
-    //for (int i = 0; i < ntest; ++i)
-    //    boxes_array = engine->commits(images);
-
-    //// wait all result
-    //boxes_array.back().get();
-
-    //float inference_average_time = (iLogger::timestamp_now_float() - begin_timer) / ntest / images.size();
-    //auto type_name = Yolo::type_name(type);
-    //auto mode_name = TRT::mode_string(mode);
-    //INFO("%s[%s] average: %.2f ms / image, FPS: %.2f", engine_file.c_str(), type_name, inference_average_time, 1000 / inference_average_time);
-
-    //for (int i = 0; i < boxes_array.size(); ++i) {
-
-    //    auto& image = images[i];
-    //    auto boxes = boxes_array[i].get();
-
-    //    for (auto& obj : boxes) {
-    //        uint8_t b, g, r;
-    //        tie(b, g, r) = iLogger::random_color(obj.class_label);
-    //        cv::rectangle(image, cv::Point(obj.left, obj.top), cv::Point(obj.right, obj.bottom), cv::Scalar(b, g, r), 5);
-
-    //        auto name = cocolabels[obj.class_label];
-    //        auto caption = iLogger::format("%s %.2f", name, obj.confidence);
-    //        int width = cv::getTextSize(caption, 0, 1, 2, nullptr).width + 10;
-    //        cv::rectangle(image, cv::Point(obj.left - 3, obj.top - 33), cv::Point(obj.left + width, obj.top), cv::Scalar(b, g, r), -1);
-    //        cv::putText(image, caption, cv::Point(obj.left, obj.top - 5), 0, 1, cv::Scalar::all(0), 2, 16);
-    //    }
-
-    //}
-    return engine;
-}
-
-static shared_ptr<Yolo::Infer> test(Yolo::Type type, TRT::Mode mode, const string& model) {
+static shared_ptr<Yolo::Infer> app_yolo(Yolo::Type type, TRT::Mode mode, const string& model) {
 
     int deviceid = 1;
     auto mode_name = TRT::mode_string(mode);
@@ -201,7 +143,22 @@ static shared_ptr<Yolo::Infer> test(Yolo::Type type, TRT::Mode mode, const strin
         );
     }
 
-    return inference_and_performance(deviceid, model_file, mode, type);
+    auto engine = Yolo::create_infer(
+        model_file,                // engine file
+        type,                       // yolo type, Yolo::Type::V5 / Yolo::Type::X
+        deviceid,                   // gpu id
+        0.60f,                      // confidence threshold
+        0.80f,                      // nms threshold
+        Yolo::NMSMethod::FastGPU,   // NMS method, fast GPU / CPU
+        1,                          // max objects
+        false                       // preprocess use multi stream
+    );
+    if (engine == nullptr) {
+        INFOE("Engine is nullptr");
+        exit(1);
+    }
+
+    return engine;
 }
 
 class DemoApplication
@@ -373,7 +330,7 @@ public:
 int Grab60FPS(int nFrames)
 {
     iLogger::set_log_level(iLogger::LogLevel::Debug);
-    auto engine = test(Yolo::Type::V5, TRT::Mode::FP16, "yolov5l");
+    auto engine = app_yolo(Yolo::Type::V5, TRT::Mode::FP16, "yolov5l");
     const int WAIT_BASE = 6;
     DemoApplication Demo;
     HRESULT hr = S_OK;
@@ -425,7 +382,7 @@ int Grab60FPS(int nFrames)
                 Demo.Capture(wait);
             }
             RESET_WAIT_TIME(start, end, interval, freq);
-            hr = Demo.Preproc(engine, Yolo::Type::V5, TRT::Mode::FP16, "yolov5l");
+            hr = Demo.Preproc(engine, Yolo::Type::V5, TRT::Mode::FP16, "yolov5l", pose);
             if (FAILED(hr))
             {
                 printf("Preproc failed with error 0x%08x\n", hr);
