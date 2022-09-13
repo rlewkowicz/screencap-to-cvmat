@@ -17,11 +17,11 @@ class Openpose
 public:
 	Openpose(nvinfer1::Dims inputDims) {
 
-		cmap_threshold = 0.1;
-		link_threshold = 0.1;
+		cmap_threshold = 0.006;
+		link_threshold = .006;
 		cmap_window = 5;
-		line_integral_samples = 7;
-		max_num_objects = 100;
+		line_integral_samples = 5;
+		max_num_objects = 500;
 
 		N = inputDims.d[0];
 		C = inputDims.d[1];

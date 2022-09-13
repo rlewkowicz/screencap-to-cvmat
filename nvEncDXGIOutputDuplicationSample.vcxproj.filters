@@ -111,6 +111,9 @@
     <ClCompile Include="openpose\parse\refine_peaks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="mouse.pb.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Defs.h">
@@ -153,6 +156,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="openpose\parse\refine_peaks.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mouse.pb.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

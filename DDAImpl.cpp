@@ -29,15 +29,20 @@
 #include "Defs.h"
 #include "DDAImpl.h"
 #include <iomanip>
-
+#include "dxgi1_2.h"
+IDXGIOutput1* pOut1;
+IDXGIDevice3* pDevice;
+IDXGIOutput* pOutput;
+IDXGIFactory3* pFactory;
+IDXGIAdapter2* pAdapter;
 /// Initialize DDA
 HRESULT DDAImpl::Init()
 {
-    IDXGIOutput * pOutput = nullptr;
-    IDXGIDevice2* pDevice = nullptr;
-    IDXGIFactory1* pFactory = nullptr;
-    IDXGIAdapter *pAdapter = nullptr;
-    IDXGIOutput1* pOut1 = nullptr;
+    pOutput = nullptr;
+    pDevice = nullptr;
+    pFactory = nullptr;
+    pAdapter = nullptr;
+    pOut1 = nullptr;
 
     /// Release all temporary refs before exit
 #define CLEAN_RETURN(x) \
@@ -104,7 +109,8 @@ HRESULT DDAImpl::GetCapturedFrame(ID3D11Texture2D **ppTex2D, int wait)
         pResource = nullptr;
     }
 
-    hr = pDup->AcquireNextFrame(wait, &frameInfo, &pResource);
+    hr = pDup->AcquireNextFrame(500, &frameInfo, &pResource);
+    
     if (FAILED(hr))
     {
         if (hr == DXGI_ERROR_WAIT_TIMEOUT)
@@ -113,20 +119,36 @@ HRESULT DDAImpl::GetCapturedFrame(ID3D11Texture2D **ppTex2D, int wait)
         }
         if (hr == DXGI_ERROR_INVALID_CALL)
         {
-            printf(__FUNCTION__": %d : Invalid Call, previous frame not released?\n", frameno);
+            SAFE_RELEASE(pDevice); 
+            SAFE_RELEASE(pFactory); 
+            SAFE_RELEASE(pOutput); 
+            SAFE_RELEASE(pOut1); 
+            SAFE_RELEASE(pAdapter); 
+            SAFE_RELEASE(pDup);
+
+            cout << "Invalid Call, previous frame not released ? \n";
+
         }
         if (hr == DXGI_ERROR_ACCESS_LOST)
         {
-            printf(__FUNCTION__": %d : Access lost, frame needs to be released?\n", frameno);
+            SAFE_RELEASE(pDevice);
+            SAFE_RELEASE(pFactory);
+            SAFE_RELEASE(pOutput);
+            SAFE_RELEASE(pOut1);
+            SAFE_RELEASE(pAdapter);
+            SAFE_RELEASE(pDup);
+
+           cout << "Access lost, frame needs to be released?\n";
+
         }
         RETURN_ERR(hr);
     }
-    if (frameInfo.AccumulatedFrames == 0 || frameInfo.LastPresentTime.QuadPart == 0)
-    {
-        // No image update, only cursor moved.
-        //ofs << "frameNo: " << frameno << " | Accumulated: " << frameInfo.AccumulatedFrames << "MouseOnly?" << frameInfo.LastMouseUpdateTime.QuadPart << endl;
-        RETURN_ERR(DXGI_ERROR_WAIT_TIMEOUT);
-    }
+    //if (frameInfo.AccumulatedFrames == 0 || frameInfo.LastPresentTime.QuadPart == 0)
+    //{
+    //    // No image update, only cursor moved.
+    //    //ofs << "frameNo: " << frameno << " | Accumulated: " << frameInfo.AccumulatedFrames << "MouseOnly?" << frameInfo.LastMouseUpdateTime.QuadPart << endl;
+    //    RETURN_ERR(DXGI_ERROR_WAIT_TIMEOUT);
+    //}
 
     if (!pResource)
     {

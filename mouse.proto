@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package proto_messages;
+
+message mouse_report
+{
+    int32 x = 1;
+    int32 y = 2;
+}

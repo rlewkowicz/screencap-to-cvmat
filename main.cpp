@@ -26,6 +26,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <ecal/ecal.h>
+#include <ecal/msg/protobuf/publisher.h>
+
+#include <iostream>
+#include <thread>
 #include "Defs.h"
 #include "DDAImpl.h"
 #include "opencv2/core/directx.hpp"
@@ -46,27 +51,41 @@
 #include "openpose/TensorrtPoseNet.h"
 #include <atlstr.h>
 #include <future>
+#include <sstream>
+#include <cstring> 
+#include "mouse.pb.h"
+
+#include <cstdlib>
+
+eCAL::protobuf::CPublisher<proto_messages::mouse_report> publisher;
 
 cv::Mat mat;
 bool DEBUG=false;
-
-using namespace std;
-using namespace cv;
-
-TensorrtPoseNet posenet;
-Openpose openpose(posenet.outputDims[0]);
-
-static const char* cocolabels[] = {
-    "enemy"
-};
 
 struct img_and_coord {
     cv::Mat mat;
     int x = 999;
     int y = 999;
+    int conf;
 };
 
 typedef struct img_and_coord img_and_coord;
+
+img_and_coord last_img_and_coord;
+int global_conf = 0;
+int frames_without_detect = 3;
+int last_conf = 0;
+int divisor = 1;
+
+using namespace std;
+using namespace cv;
+
+//TensorrtPoseNet posenet;
+//Openpose openpose(posenet.outputDims[0]);
+
+static const char* cocolabels[] = {
+    "enemy"
+};
 
 static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image, int deviceid, TRT::Mode mode, Yolo::Type type) {
     img_and_coord img_and_coord;
@@ -100,6 +119,7 @@ static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image
             }
             img_and_coord.x = obj.right;
             img_and_coord.y = obj.bottom;
+            img_and_coord.conf = int(obj.confidence*100);
         }
         if (DEBUG) {
             img_and_coord.mat = image;
@@ -148,7 +168,7 @@ static shared_ptr<Yolo::Infer> app_yolo(Yolo::Type type, TRT::Mode mode, const s
         model_file,                // engine file
         type,                       // yolo type, Yolo::Type::V5 / Yolo::Type::X
         deviceid,                   // gpu id
-        0.60f,                      // confidence threshold
+        0.05f,                      // confidence threshold
         0.80f,                      // nms threshold
         Yolo::NMSMethod::FastGPU,   // NMS method, fast GPU / CPU
         1,                          // max objects
@@ -264,17 +284,44 @@ public:
         return hr;
     }
 
-    void run_pose() {
-        posenet.infer(mat);
-        openpose.detect(posenet.cpuCmapBuffer, posenet.cpuPafBuffer, mat);
+    void determine_confidence(img_and_coord img_and_coord) {
+        global_conf = img_and_coord.conf;
+        int x = img_and_coord.x;
+        int y = img_and_coord.y;
+        int last_x = last_img_and_coord.x;
+        int last_y = last_img_and_coord.y;
+        if (last_conf < 0)
+            last_conf = 0;
+        if (last_conf > 68) {
+            if (abs(x - last_x) < 30 && abs(y - last_y) < 30) {
+                global_conf += 50;
+            }
+            else if (abs(x - last_x) < 20 && abs(y - last_y) < 40) {
+                global_conf += 90;
+            }
+            else if (abs(x - last_x) > 30 && abs(y - last_y) < 40) {
+                global_conf -= 10;
+            }
+        }
+        else if (last_conf < 20) {
+            global_conf -= 10;
+        }
+        last_conf = global_conf;
+        last_img_and_coord = img_and_coord;
     }
+
+    //static void run_pose() {
+    //    posenet.infer(mat);
+    //    openpose.detect(posenet.cpuCmapBuffer, posenet.cpuPafBuffer, mat);
+    //}
 
     HRESULT Preproc(shared_ptr<Yolo::Infer> engine, Yolo::Type type, TRT::Mode mode, const string& model)
     {
+        int arr[2] = { 0,0 };
+
         HRESULT hr = S_OK;
 
         D3D11_TEXTURE2D_DESC desc;
-        ZeroMemory(&desc, sizeof(desc));
         pDupTex2D->GetDesc(&desc);
 
         desc.Width = 640;
@@ -298,16 +345,52 @@ public:
         cv::cvtColor(mat, mat, cv::COLOR_RGBA2RGB);
             
         auto t1 = std::async(std::launch::async, run_inf_debug, engine, mat, 1, mode, type);
-        run_pose();
+        //run_pose();
+        t1.wait();
+        //t2.wait();
+
         img_and_coord img_and_coord = t1.get();
+
+        if (img_and_coord.x == 999 || img_and_coord.y == 999) {
+            frames_without_detect = frames_without_detect + 1;
+            if (frames_without_detect >= 3) {
+                frames_without_detect = 3;
+                global_conf = 0;
+                last_conf = 0;
+            }
+        }
+        else {
+            frames_without_detect = 0;
+        }
+
+        if (img_and_coord.x != 999 && img_and_coord.y != 999) {
+            determine_confidence(img_and_coord);
+           
+            proto_messages::mouse_report mouse_report;
+            mouse_report.set_x(int(-(320 - img_and_coord.x)));
+            mouse_report.set_y(int(-(320 - img_and_coord.y)));
+
+            if (global_conf > 60) {
+                 publisher.Send(mouse_report);
+            }
+
+            SAFE_RELEASE(pDupTex2D);
+            SAFE_RELEASE(myText);
+        }            
         
         if (DEBUG) {
+            if (img_and_coord.x != 999 || img_and_coord.y != 999) {
+                cout << "conf: " << img_and_coord.conf << endl;
+                cout << "global_conf: " << global_conf << endl << endl;
+            }
             cv::namedWindow("enemy");
             cv::resizeWindow("enemy", 640, 640);
             cv::imshow("enemy", img_and_coord.mat);
+            //cv::imshow("enemy", mat);
             cv::waitKey(1);
         }
         SAFE_RELEASE(pDupTex2D);
+        SAFE_RELEASE(myText);
         returnIfError(hr);
 
         return hr;
@@ -338,9 +421,15 @@ public:
 
 int Grab60FPS(int nFrames)
 {
-    iLogger::set_log_level(iLogger::LogLevel::Debug);
-    auto engine = app_yolo(Yolo::Type::V5, TRT::Mode::FP16, "yolov5l");
-    const int WAIT_BASE = 6;
+    if (DEBUG == true) {
+        iLogger::set_log_level(iLogger::LogLevel::Debug);
+    }
+    else {
+        iLogger::set_log_level(iLogger::LogLevel::Fatal);
+    }
+    string yolo_mode = "yolov5x6";
+    auto engine = app_yolo(Yolo::Type::V5, TRT::Mode::FP16, yolo_mode);
+    const int WAIT_BASE = 4;
     DemoApplication Demo;
     HRESULT hr = S_OK;
     int capturedFrames = 0;
@@ -391,7 +480,7 @@ int Grab60FPS(int nFrames)
                 Demo.Capture(wait);
             }
             RESET_WAIT_TIME(start, end, interval, freq);
-            hr = Demo.Preproc(engine, Yolo::Type::V5, TRT::Mode::FP16, "yolov5l");
+            hr = Demo.Preproc(engine, Yolo::Type::V5, TRT::Mode::FP16, yolo_mode);
             if (FAILED(hr))
             {
                 printf("Preproc failed with error 0x%08x\n", hr);
@@ -403,13 +492,17 @@ int Grab60FPS(int nFrames)
     return 0;
 }
 
+
 int main(int argc, char** argv)
 {
+    eCAL::Initialize(argc, argv, "yolo");
+    publisher = eCAL::protobuf::CPublisher<proto_messages::mouse_report>("yolo");
 
+    DEBUG = false;
     CString envvar;
     if (envvar.GetEnvironmentVariable(_T("DEBUG")))
     {
-        DEBUG = true;
+        DEBUG = false;
     }
 
     int nFrames = 1;
