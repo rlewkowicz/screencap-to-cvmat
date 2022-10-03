@@ -41,7 +41,7 @@ TensorrtPoseNet::TensorrtPoseNet(const std::string &engineFilePath, float confTh
 
 
 	//cudaSetDevice(1);
-	cudaSetDevice(1);
+	cudaSetDevice(0);
 	std::fstream file;
 
 	confThreshold = confThresh;

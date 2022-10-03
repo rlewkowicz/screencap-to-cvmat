@@ -1,5 +1,7 @@
 #include "Openpose.h"
 
+std::vector<std::vector<int>> pose_vec = {};
+
 void Openpose::detect(std::vector<float> cmap_vector, std::vector<float> paf_vector, cv::Mat& frame)
 {
 	/*
@@ -105,24 +107,43 @@ void Openpose::detect(std::vector<float> cmap_vector, std::vector<float> paf_vec
 				float* peak = &refined_peaks_ptr[j * M * 2];
 				int x = (int)(peak[k * 2 + 1] * frame.cols);
 				int y = (int)(peak[k * 2] * frame.rows);
-				circle(frame, cv::Point(x, y), 3, cv::Scalar(0, 255, 0), cv::FILLED, 4, 0);
+				std::vector<int> v = { x, y };
+				pose_vec.push_back(v);
+				//circle(frame, cv::Point(x, y), 3, cv::Scalar(0, 255, 0), cv::FILLED, 4, 0);
 			}
 		}
 
-		for (int k = 0; k < K; k++) {
-			int c_a = topology[k * 4 + 2];
-			int c_b = topology[k * 4 + 3];
+		//for (int i = 0; i < object_counts[0]; i++) {
 
-			if (obj[c_a] >= 0 && obj[c_b] >= 0) {
-				float* peak0 = &refined_peaks_ptr[c_a * M * 2];
-				float* peak1 = &refined_peaks_ptr[c_b * M * 2];
+		//	int* obj = &objects_ptr[C * i];
 
-				int x0 = (int)(peak0[(int)obj[c_a] * 2 + 1] * frame.cols);
-				int y0 = (int)(peak0[(int)obj[c_a] * 2] * frame.rows);
-				int x1 = (int)(peak1[(int)obj[c_b] * 2 + 1] * frame.cols);
-				int y1 = (int)(peak1[(int)obj[c_b] * 2] * frame.rows);
-				line(frame, cv::Point(x0, y0), cv::Point(x1, y1), cv::Scalar(0, 255, 0), 2, 1);
-			}
-		}
+		//	for (int j = 0; j < C; j++) {
+
+		//		int k = (int)obj[j];
+		//		if (k >= 0) {
+		//			float* peak = &refined_peaks_ptr[j * M * 2];
+		//			int x = (int)(peak[k * 2 + 1] * frame.cols);
+		//			int y = (int)(peak[k * 2] * frame.rows);
+		//			std::vector<int> v = { x, y };
+		//			pose_vec.push_back(v);
+		//			circle(frame, cv::Point(x, y), 3, cv::Scalar(0, 255, 0), cv::FILLED, 4, 0);
+		//		}
+		//	}
+
+			//for (int k = 0; k < K; k++) {
+			//	int c_a = topology[k * 4 + 2];
+			//	int c_b = topology[k * 4 + 3];
+
+			//	if (obj[c_a] >= 0 && obj[c_b] >= 0) {
+			//		float* peak0 = &refined_peaks_ptr[c_a * M * 2];
+			//		float* peak1 = &refined_peaks_ptr[c_b * M * 2];
+
+			//		int x0 = (int)(peak0[(int)obj[c_a] * 2 + 1] * frame.cols);
+			//		int y0 = (int)(peak0[(int)obj[c_a] * 2] * frame.rows);
+			//		int x1 = (int)(peak1[(int)obj[c_b] * 2 + 1] * frame.cols);
+			//		int y1 = (int)(peak1[(int)obj[c_b] * 2] * frame.rows);
+			//		line(frame, cv::Point(x0, y0), cv::Point(x1, y1), cv::Scalar(0, 255, 0), 2, 1);
+			//	}
+			//}
 	}
 }

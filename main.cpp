@@ -80,19 +80,37 @@ int divisor = 1;
 using namespace std;
 using namespace cv;
 
-//TensorrtPoseNet posenet;
-//Openpose openpose(posenet.outputDims[0]);
+TensorrtPoseNet posenet;
+Openpose openpose(posenet.outputDims[0]);
 
 static const char* cocolabels[] = {
     "enemy"
 };
 
-static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image, int deviceid, TRT::Mode mode, Yolo::Type type) {
+std::string gen_random(const int len) {
+    static const char alphanum[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+    std::string tmp_s;
+    tmp_s.reserve(len);
+
+    for (int i = 0; i < len; ++i) {
+        tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+
+    return tmp_s;
+}
+
+int COUNT = 0;
+static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image, int deviceid, TRT::Mode mode, Yolo::Type type, bool is_ret = false) {
     img_and_coord img_and_coord;
     const int ntest = 100;
     vector<shared_future<Yolo::BoxArray>> boxes_array;
     boxes_array.clear();
     vector<cv::Mat> images;
+
+    COUNT = COUNT + 1;
 
     images.emplace_back(image);
     boxes_array = engine->commits(images);
@@ -102,11 +120,21 @@ static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image
     auto mode_name = TRT::mode_string(mode);
 
     for (int i = 0; i < 1; ++i) {
-
         auto boxes = boxes_array[i].get();
 
         for (auto& obj : boxes) {
-            if (DEBUG) {
+            if (COUNT > 400) {
+                if (obj.confidence * 100 < 80 && obj.confidence * 100 > 10) {
+                    if (is_ret == false) {
+                        cv::imwrite("C:\\tmp\\guard\\" + gen_random(14) + ".bmp", image);
+                    }
+                    else {
+                        cv::imwrite("C:\\tmp\\ret\\" + gen_random(14) + ".bmp", image);
+                    }
+                }
+                COUNT = 0;
+            }
+            if (false) {
                 uint8_t b, g, r;
                 tie(b, g, r) = iLogger::random_color(obj.class_label);
                 cv::rectangle(image, cv::Point(obj.left, obj.top), cv::Point(obj.right, obj.bottom), cv::Scalar(b, g, r), 5);
@@ -129,9 +157,9 @@ static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image
     }
 }
 
-static shared_ptr<Yolo::Infer> app_yolo(Yolo::Type type, TRT::Mode mode, const string& model) {
+static shared_ptr<Yolo::Infer> app_yolo(Yolo::Type type, TRT::Mode mode, const string& model, string prefix) {
 
-    int deviceid = 1;
+    int deviceid = 0;
     auto mode_name = TRT::mode_string(mode);
     TRT::set_device(deviceid);
 
@@ -144,15 +172,15 @@ static shared_ptr<Yolo::Infer> app_yolo(Yolo::Type type, TRT::Mode mode, const s
             Yolo::image_to_tensor(image, tensor, type, i);
         }
     };
-
-    string onnx_file = iLogger::format("best.onnx");
-    string model_file = iLogger::format("best.trtmodel");
+    string onnx_string = prefix + ".onnx";
+    string model_string = prefix + ".trtmodel";
+    string onnx_file = iLogger::format(onnx_string.c_str());
+    string model_file = iLogger::format(model_string.c_str());
     int test_batch_size = 1;
-
 
     if (!iLogger::exists(model_file)) {
         TRT::compile(
-            mode,                       // FP32、FP16、INT8
+            mode,                       // FP16、FP16、INT8
             test_batch_size,            // max batch size
             onnx_file,                  // source 
             model_file,                 // save to
@@ -163,13 +191,19 @@ static shared_ptr<Yolo::Infer> app_yolo(Yolo::Type type, TRT::Mode mode, const s
             10000000000
         );
     }
-
+    float thresh;
+    if (onnx_string == "ret.onnx") {
+        thresh = 0.3f;
+    }
+    else {
+        thresh = 0.2f;
+    }
     auto engine = Yolo::create_infer(
         model_file,                // engine file
         type,                       // yolo type, Yolo::Type::V5 / Yolo::Type::X
         deviceid,                   // gpu id
-        0.05f,                      // confidence threshold
-        0.80f,                      // nms threshold
+        thresh,                // confidence threshold
+        0.90f,                      // nms threshold
         Yolo::NMSMethod::FastGPU,   // NMS method, fast GPU / CPU
         1,                          // max objects
         false                       // preprocess use multi stream
@@ -284,38 +318,155 @@ public:
         return hr;
     }
 
-    void determine_confidence(img_and_coord img_and_coord) {
+    img_and_coord determine_confidence(img_and_coord img_and_coord) {
         global_conf = img_and_coord.conf;
         int x = img_and_coord.x;
         int y = img_and_coord.y;
         int last_x = last_img_and_coord.x;
         int last_y = last_img_and_coord.y;
-        if (last_conf < 0)
-            last_conf = 0;
-        if (last_conf > 68) {
-            if (abs(x - last_x) < 30 && abs(y - last_y) < 30) {
-                global_conf += 50;
-            }
-            else if (abs(x - last_x) < 20 && abs(y - last_y) < 40) {
-                global_conf += 90;
-            }
-            else if (abs(x - last_x) > 30 && abs(y - last_y) < 40) {
-                global_conf -= 10;
+        int my_count = 0;
+        for (auto i : pose_vec) {
+            int is_even;
+            for (auto a : i) {
+                if (is_even == 0) {
+                    is_even = is_even + 1;
+                    if (abs(x - a) < 30) {
+                        my_count = my_count + 1;
+                    }
+                }
+                else {
+                    if (abs(y - a) < 30) {
+                        my_count = my_count + 1;
+                    }
+                }
             }
         }
-        else if (last_conf < 20) {
-            global_conf -= 10;
+        pose_vec.clear();
+        //cout << my_count << endl;
+        if (my_count > 1) {
+            global_conf += 59;
+        }
+        my_count = 0;
+        if (last_conf < 0)
+            last_conf = 0;
+        if (last_conf > 70) {
+            if (abs(x - last_x) < 20 && abs(y - last_y) < 20) {
+                global_conf += 39;
+            }
+            else if (abs(x - last_x) < 30 && abs(y - last_y) < 30) {
+                global_conf += 29;
+            }
+        }
+        else if (last_conf != 0) {
+            img_and_coord.x = (last_x + x + x)/3;
+            img_and_coord.y = (last_y + y + y)/3;
         }
         last_conf = global_conf;
         last_img_and_coord = img_and_coord;
+        my_count = 0;
+        return img_and_coord;
     }
 
-    //static void run_pose() {
-    //    posenet.infer(mat);
-    //    openpose.detect(posenet.cpuCmapBuffer, posenet.cpuPafBuffer, mat);
-    //}
+    static int run_pose(int i) {
+        posenet.infer(mat);
+        openpose.detect(posenet.cpuCmapBuffer, posenet.cpuPafBuffer, mat);
+        return 0;
+    }
 
-    HRESULT Preproc(shared_ptr<Yolo::Infer> engine, Yolo::Type type, TRT::Mode mode, const string& model)
+    static int find_red(cv::Mat mat) {
+        bool found = false;
+        int rgb_total = 0;
+        int rgbs_count = 0;
+        int gap = 0;
+        bool grey = false;
+        bool white = false;
+
+        for (int x = 0; x < 640; x++) {
+            for (int y = 0; y < 640; y++) {
+                int b = mat.at<Vec3b>(y, x)[0];
+                int g = mat.at<Vec3b>(y, x)[1];
+                int r = mat.at<Vec3b>(y, x)[2];
+                if (grey == true && (r > 140 && r < 220) && (g > 40 && g < 80) && (b > 30 && b < 130)) {
+                    white == false;
+
+                    for (int i = 4; i < 8; i++) {
+                        if (y - i < 640 && y - i > 0) {
+                            int b = mat.at<Vec3b>(y - i, x)[0];
+                            int g = mat.at<Vec3b>(y - i, x)[1];
+                            int r = mat.at<Vec3b>(y - i, x)[2];
+
+                            if (r > 175 && g > 175 && b > 175) {
+                                white = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (white == true) {
+                        for (int i = 0; i < 40; i++) {
+                            if (y + i < 640 && y + i > 0) {
+                                int b = mat.at<Vec3b>(y + i, x)[0];
+                                int g = mat.at<Vec3b>(y + i, x)[1];
+                                int r = mat.at<Vec3b>(y + i, x)[2];
+
+
+                                if ((r > 140 && r < 220) && (g > 40 && g < 80) && (b > 30 && b < 130)) {
+                                    rgb_total = rgb_total + 1;
+                                }
+                                else if (rgb_total > 0) {
+                                    gap = gap + 1;
+                                }
+                                if (gap > 0) {
+                                    if (rgb_total < 7 || rgb_total > 20) {
+                                        gap = 0;
+                                        rgb_total = 0;
+                                    }
+                                    else if (rgb_total > 7 && rgb_total < 20) {
+                                        for (int a = 0; a < rgb_total; a++) {
+                                            if (y + a < 640 && y + a > 0) {
+                                                //mat.at<Vec3b>(y + a, x)[0] = 255;
+                                                //mat.at<Vec3b>(y + a, x)[1] = 255;
+                                                //mat.at<Vec3b>(y + a, x)[2] = 255;
+                                            }
+                                        }
+                                        found = true;
+                                        rgbs_count = rgbs_count + 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (rgb_total > 5 && rgb_total < 25) {
+                        found = true;
+                        break;
+                    }
+                }
+                else if (grey == false && ((r > 40 && r < 130) && (g > 40 && g < 130) && (b > 40 && b < 130))) {
+                    for (int i = 0; i < 20; i++) {
+                        if (y + i < 640 && y + i > 0) {
+                            int b = mat.at<Vec3b>(y + i, x)[0];
+                            int g = mat.at<Vec3b>(y + i, x)[1];
+                            int r = mat.at<Vec3b>(y + i, x)[2];
+
+
+                            if (r > 200 && g > 200 && b > 200) {
+                                grey = true;
+                            }
+                        }
+                    }
+                }
+                if (found) {
+                    found = false;
+                    break;
+                }
+            }
+        }
+        return rgbs_count;
+    }
+
+    int pose_count = 2;
+    HRESULT Preproc(shared_ptr<Yolo::Infer> engine, Yolo::Type type, TRT::Mode mode, const string& model, shared_ptr<Yolo::Infer> ret)
     {
         int arr[2] = { 0,0 };
 
@@ -343,15 +494,33 @@ public:
         cv::directx::convertFromD3D11Texture2D(myText, mat);
 
         cv::cvtColor(mat, mat, cv::COLOR_RGBA2RGB);
-            
-        auto t1 = std::async(std::launch::async, run_inf_debug, engine, mat, 1, mode, type);
-        //run_pose();
-        t1.wait();
-        //t2.wait();
 
-        img_and_coord img_and_coord = t1.get();
+        img_and_coord ret_coord;
+        img_and_coord yolo;
+        int rgb_total = 0;
 
-        if (img_and_coord.x == 999 || img_and_coord.y == 999) {
+        if (pose_count == 2) {
+            auto t4 = std::async(std::launch::async, find_red, mat);
+            auto t3 = std::async(std::launch::async, run_pose, 1);
+            auto t1 = std::async(std::launch::async, run_inf_debug, engine, mat, 1, mode, type, false);
+            auto t2 = std::async(std::launch::async, run_inf_debug, ret, mat, 1, TRT::Mode::FP16, Yolo::Type::V5, true);
+            ret_coord = t2.get();
+            yolo = t1.get();
+            auto a = t3.get();
+            rgb_total = t4.get();
+            pose_count = 0;
+        }
+        else {
+            auto t4 = std::async(std::launch::async, find_red, mat);
+            auto t1 = std::async(std::launch::async, run_inf_debug, engine, mat, 1, mode, type, false);
+            auto t2 = std::async(std::launch::async, run_inf_debug, ret, mat, 1, TRT::Mode::FP16, Yolo::Type::V5, true);
+            ret_coord = t2.get();
+            yolo = t1.get();
+            rgb_total = t4.get();
+            pose_count = pose_count + 1;
+        }
+
+        if (yolo.x == 999 || yolo.y == 999) {
             frames_without_detect = frames_without_detect + 1;
             if (frames_without_detect >= 3) {
                 frames_without_detect = 3;
@@ -363,29 +532,52 @@ public:
             frames_without_detect = 0;
         }
 
-        if (img_and_coord.x != 999 && img_and_coord.y != 999) {
-            determine_confidence(img_and_coord);
-           
-            proto_messages::mouse_report mouse_report;
-            mouse_report.set_x(int(-(320 - img_and_coord.x)));
-            mouse_report.set_y(int(-(320 - img_and_coord.y)));
+        if (yolo.x != 999 && yolo.y != 999) {
 
-            if (global_conf > 60) {
+            yolo = determine_confidence(yolo);
+
+            int x = int(-(320 - yolo.x));
+            int y = int(-(320 - yolo.y));
+            int dx = 0;
+            int dy = 0;
+            if (ret_coord.x != 999 || ret_coord.y != 999) {
+                if (ret_coord.conf > 1) {
+                    dx = int((ret_coord.x - yolo.x));
+                    dy = int((ret_coord.y - yolo.y));
+                }
+
+                x = -dx+20;
+                y = -dy+20;
+
+            }
+            proto_messages::mouse_report mouse_report;
+            mouse_report.set_x(x);
+            mouse_report.set_y(y);
+
+            if (rgb_total > 6 && rgb_total < 200) {
+                global_conf = global_conf + 40;
+            }
+            else {
+                global_conf = global_conf - 30;
+            }
+
+            if (global_conf > 68) {
                  publisher.Send(mouse_report);
             }
 
+            
             SAFE_RELEASE(pDupTex2D);
             SAFE_RELEASE(myText);
         }            
         
         if (DEBUG) {
-            if (img_and_coord.x != 999 || img_and_coord.y != 999) {
-                cout << "conf: " << img_and_coord.conf << endl;
+            if (yolo.x != 999 || yolo.y != 999) {
+                cout << "conf: " << yolo.conf << endl;
                 cout << "global_conf: " << global_conf << endl << endl;
             }
             cv::namedWindow("enemy");
             cv::resizeWindow("enemy", 640, 640);
-            cv::imshow("enemy", img_and_coord.mat);
+            cv::imshow("enemy", ret_coord.mat);
             //cv::imshow("enemy", mat);
             cv::waitKey(1);
         }
@@ -394,6 +586,7 @@ public:
         returnIfError(hr);
 
         return hr;
+        pose_vec.clear();
     }
 
     void Cleanup(bool bDelete = true)
@@ -419,6 +612,8 @@ public:
     }
 };
 
+int frame_avg_num = 0;
+int frame_avg_total = 0;
 int Grab60FPS(int nFrames)
 {
     if (DEBUG == true) {
@@ -428,8 +623,13 @@ int Grab60FPS(int nFrames)
         iLogger::set_log_level(iLogger::LogLevel::Fatal);
     }
     string yolo_mode = "yolov5x6";
-    auto engine = app_yolo(Yolo::Type::V5, TRT::Mode::FP16, yolo_mode);
-    const int WAIT_BASE = 4;
+    auto t1 = std::async(std::launch::async, app_yolo, Yolo::Type::V5, TRT::Mode::FP16, "yolov5s6", "x6");
+    auto t2 = std::async(std::launch::async, app_yolo, Yolo::Type::V5, TRT::Mode::FP16, "yolov5s6", "ret");
+    auto engine = t1.get();
+    auto ret = t2.get();
+    //auto engine = app_yolo(Yolo::Type::V5, TRT::Mode::FP16, "yolov5s6", "x6");
+    //auto ret = app_yolo(Yolo::Type::V5, TRT::Mode::FP16, "yolov5s6", "ret");
+    const int WAIT_BASE = 500;
     DemoApplication Demo;
     HRESULT hr = S_OK;
     int capturedFrames = 0;
@@ -439,13 +639,13 @@ int Grab60FPS(int nFrames)
     LARGE_INTEGER freq = { 0 };
     int wait = WAIT_BASE;
 
-    QueryPerformanceFrequency(&freq);
+  //  QueryPerformanceFrequency(&freq);
 
     /// Reset waiting time for the next screen capture attempt
-#define RESET_WAIT_TIME(start, end, interval, freq)         \
+/*#define RESET_WAIT_TIME(start, end, interval, freq)         \
     QueryPerformanceCounter(&end);                          \
     interval.QuadPart = end.QuadPart - start.QuadPart;      \
-    MICROSEC_TIME(interval, freq);                          \
+    MICROSEC_TIME(interval, freq);    \  */                    
 
     hr = Demo.Init();
     if (FAILED(hr))
@@ -456,11 +656,14 @@ int Grab60FPS(int nFrames)
 
     do
     {
-        QueryPerformanceCounter(&start);
+
+        if (frame_avg_num < 3) {
+        auto start = std::chrono::high_resolution_clock::now();
+        //QueryPerformanceCounter(&start);
         hr = Demo.Capture(wait);
         if (hr == DXGI_ERROR_WAIT_TIMEOUT) 
         {
-            RESET_WAIT_TIME(start, end, interval, freq);
+           // RESET_WAIT_TIME(start, end, interval, freq);
             continue;
         }
         else
@@ -475,18 +678,33 @@ int Grab60FPS(int nFrames)
                     printf("Failed to Init DDDemo. return error 0x%08x\n", hr);
                     return -1;
                 }
-                RESET_WAIT_TIME(start, end, interval, freq);
-                QueryPerformanceCounter(&start);
+               // RESET_WAIT_TIME(start, end, interval, freq);
+               // QueryPerformanceCounter(&start);
                 Demo.Capture(wait);
             }
-            RESET_WAIT_TIME(start, end, interval, freq);
-            hr = Demo.Preproc(engine, Yolo::Type::V5, TRT::Mode::FP16, yolo_mode);
+            //RESET_WAIT_TIME(start, end, interval, freq);
+
+
+                hr = Demo.Preproc(engine, Yolo::Type::V5, TRT::Mode::FP16, yolo_mode, ret);
+
+            }
+
             if (FAILED(hr))
             {
                 printf("Preproc failed with error 0x%08x\n", hr);
                 return -1;
             }
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            frame_avg_total = frame_avg_total + duration.count();
+            frame_avg_num = frame_avg_num + 1;
         }
+    else {
+        //cout << frame_avg_total / 3 << endl;
+        frame_avg_total = 0;
+        frame_avg_num = 0;
+    }
+
     } while (true);
 
     return 0;
@@ -502,7 +720,7 @@ int main(int argc, char** argv)
     CString envvar;
     if (envvar.GetEnvironmentVariable(_T("DEBUG")))
     {
-        DEBUG = false;
+        DEBUG = true;
     }
 
     int nFrames = 1;

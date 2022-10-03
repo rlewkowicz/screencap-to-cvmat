@@ -54,7 +54,6 @@ class TensorrtPoseNet
 	using UniquePtr = std::unique_ptr<T, InferDeleter>;
 
 public: 
-
 	TensorrtPoseNet(const std::string &engineFilePath = "trt_pose_fp16.engine", float confThresh = 0.01, float nmsThresh = 0.1);
 	
 	void infer(cv::Mat &img);	

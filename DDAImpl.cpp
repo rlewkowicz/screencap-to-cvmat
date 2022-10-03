@@ -109,7 +109,7 @@ HRESULT DDAImpl::GetCapturedFrame(ID3D11Texture2D **ppTex2D, int wait)
         pResource = nullptr;
     }
 
-    hr = pDup->AcquireNextFrame(500, &frameInfo, &pResource);
+    hr = pDup->AcquireNextFrame(wait, &frameInfo, &pResource);
     
     if (FAILED(hr))
     {

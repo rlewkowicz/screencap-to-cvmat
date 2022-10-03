@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <opencv2/opencv.hpp>
 
+extern std::vector<std::vector<int>> pose_vec;
+
 class Openpose
 {
 
