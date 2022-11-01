@@ -110,7 +110,7 @@ static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image
     boxes_array.clear();
     vector<cv::Mat> images;
 
-    COUNT = COUNT + 1;
+
 
     images.emplace_back(image);
     boxes_array = engine->commits(images);
@@ -123,17 +123,20 @@ static img_and_coord run_inf_debug(shared_ptr<Yolo::Infer> engine, cv::Mat image
         auto boxes = boxes_array[i].get();
 
         for (auto& obj : boxes) {
-            if (COUNT > 400) {
+
                 if (obj.confidence * 100 < 80 && obj.confidence * 100 > 10) {
-                    if (is_ret == false) {
-                        cv::imwrite("C:\\tmp\\guard\\" + gen_random(14) + ".bmp", image);
-                    }
-                    else {
-                        cv::imwrite("C:\\tmp\\ret\\" + gen_random(14) + ".bmp", image);
+                    COUNT = COUNT + 1;
+                    if (COUNT > 5) {
+                        if (is_ret == false) {
+                            cv::imwrite("C:\\tmp\\guard\\" + gen_random(14) + ".bmp", image);
+                        }
+                        else {
+                           // cv::imwrite("C:\\tmp\\ret\\" + gen_random(14) + ".bmp", image);
+                        }
+                        COUNT = 0;
                     }
                 }
-                COUNT = 0;
-            }
+                
             if (false) {
                 uint8_t b, g, r;
                 tie(b, g, r) = iLogger::random_color(obj.class_label);
@@ -349,7 +352,7 @@ public:
         my_count = 0;
         if (last_conf < 0)
             last_conf = 0;
-        if (last_conf > 70) {
+        if (last_conf > 50) {
             if (abs(x - last_x) < 20 && abs(y - last_y) < 20) {
                 global_conf += 39;
             }
@@ -358,8 +361,8 @@ public:
             }
         }
         else if (last_conf != 0) {
-            img_and_coord.x = (last_x + x + x)/3;
-            img_and_coord.y = (last_y + y + y)/3;
+            img_and_coord.x = (x );
+            img_and_coord.y = ( y );
         }
         last_conf = global_conf;
         last_img_and_coord = img_and_coord;
@@ -465,7 +468,7 @@ public:
         return rgbs_count;
     }
 
-    int pose_count = 2;
+    int pose_count = 3;
     HRESULT Preproc(shared_ptr<Yolo::Infer> engine, Yolo::Type type, TRT::Mode mode, const string& model, shared_ptr<Yolo::Infer> ret)
     {
         int arr[2] = { 0,0 };
@@ -546,22 +549,22 @@ public:
                     dy = int((ret_coord.y - yolo.y));
                 }
 
-                x = -dx+20;
-                y = -dy+20;
+           /*     x = -dx+-15;
+                y = -dy+15;*/
 
             }
             proto_messages::mouse_report mouse_report;
-            mouse_report.set_x(x);
-            mouse_report.set_y(y);
+            mouse_report.set_x(int(x/2));
+            mouse_report.set_y(int(y/2));
 
             if (rgb_total > 6 && rgb_total < 200) {
-                global_conf = global_conf + 40;
+                global_conf = global_conf + 10;
             }
             else {
-                global_conf = global_conf - 30;
+                global_conf = global_conf - 65;
             }
 
-            if (global_conf > 68) {
+            if (global_conf > 38) {
                  publisher.Send(mouse_report);
             }
 
@@ -629,7 +632,7 @@ int Grab60FPS(int nFrames)
     auto ret = t2.get();
     //auto engine = app_yolo(Yolo::Type::V5, TRT::Mode::FP16, "yolov5s6", "x6");
     //auto ret = app_yolo(Yolo::Type::V5, TRT::Mode::FP16, "yolov5s6", "ret");
-    const int WAIT_BASE = 500;
+    const int WAIT_BASE = 11;
     DemoApplication Demo;
     HRESULT hr = S_OK;
     int capturedFrames = 0;
