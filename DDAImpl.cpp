@@ -108,8 +108,17 @@ HRESULT DDAImpl::GetCapturedFrame(ID3D11Texture2D **ppTex2D, int wait)
         pResource->Release();
         pResource = nullptr;
     }
+    try {
 
-    hr = pDup->AcquireNextFrame(wait, &frameInfo, &pResource);
+        //pResource->Release();
+        pDup->ReleaseFrame();
+        hr = pDup->AcquireNextFrame(wait, &frameInfo, &pResource);
+  
+    }
+    catch (...) {
+        hr = pDup->AcquireNextFrame(wait, &frameInfo, &pResource);
+    }
+
     
     if (FAILED(hr))
     {
@@ -119,18 +128,21 @@ HRESULT DDAImpl::GetCapturedFrame(ID3D11Texture2D **ppTex2D, int wait)
         }
         if (hr == DXGI_ERROR_INVALID_CALL)
         {
+
             SAFE_RELEASE(pDevice); 
-            SAFE_RELEASE(pFactory); 
-            SAFE_RELEASE(pOutput); 
-            SAFE_RELEASE(pOut1); 
-            SAFE_RELEASE(pAdapter); 
             SAFE_RELEASE(pDup);
+            pResource->Release();
+            pResource = nullptr; pResource->Release();
+            pResource = nullptr;
+            pOut1->DuplicateOutput(pDevice, &pDup);
+            hr = pDup->AcquireNextFrame(wait, &frameInfo, &pResource);
 
             cout << "Invalid Call, previous frame not released ? \n";
 
         }
         if (hr == DXGI_ERROR_ACCESS_LOST)
         {
+   
             SAFE_RELEASE(pDevice);
             SAFE_RELEASE(pFactory);
             SAFE_RELEASE(pOutput);
